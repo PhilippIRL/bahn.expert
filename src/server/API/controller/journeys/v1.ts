@@ -25,7 +25,7 @@ import type { ParsedJourneyMatchResponse } from '@/types/HAFAS/JourneyMatch';
 import type { ParsedSearchOnTripResponse } from '@/types/HAFAS/SearchOnTrip';
 import type { TsoaResponse } from '@tsoa/runtime';
 
-const allowedReferer = ['https://bahn.expert', 'https://beta.bahn.expert'];
+const allowedReferer = ['https://bahn.expert', 'https://beta.bahn.expert', 'http://localhost'];
 export function isAllowed(req: KoaRequest): boolean {
   // console.log(req);
   return (

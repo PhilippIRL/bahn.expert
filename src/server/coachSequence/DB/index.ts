@@ -59,8 +59,11 @@ const formatPlannedDate = (date: Date) =>
 
 const coachSequenceCache = new Cache<string, [Wagenreihung, DBSourceType]>(
   CacheDatabase.CoachSequenceFound,
-  5 * 60,
+  15 * 60,
 );
+
+const newDBCategories = new Set(['ICE', 'IC', 'EC', 'ECE']);
+const blockedCategories = new Set(['TRAM', 'STR', 'BUS', 'BSV', 'FLUG']);
 
 const navigatorAxios = Axios.create({
   timeout: dbCoachSequenceTimeout,
@@ -82,12 +85,21 @@ async function coachSequence(
   stopEva?: string,
   administration?: string,
 ): Promise<[Wagenreihung, DBSourceType] | undefined> {
+  if (trainCategory && blockedCategories.has(trainCategory)) {
+    return undefined;
+  }
   const cacheKey = `${trainNumber}-${date}-${plannedStartDate}-${trainCategory}-${stopEva}-${administration}`;
   const cached = await coachSequenceCache.get(cacheKey);
   if (cached) {
     return cached;
   }
-  if (plannedStartDate && trainCategory && stopEva && administration) {
+  if (
+    plannedStartDate &&
+    trainCategory &&
+    stopEva &&
+    administration &&
+    newDBCategories.has(trainCategory.toUpperCase())
+  ) {
     try {
       const [url, type] = getDBCoachSequenceUrl(
         trainNumber,
@@ -108,6 +120,7 @@ async function coachSequence(
       // we just ignore it and try the next one
     }
   }
+
   try {
     const [url, type] = getDBCoachSequenceUrl(trainNumber, date);
     UpstreamApiRequestMetric.inc({

@@ -1,6 +1,6 @@
 import { Cache, CacheDatabase } from '@/server/cache';
 import { searchStopPlace } from '@/server/StopPlace/search';
-import tripSearch from './TripSearch';
+import { tripSearch } from './TripSearch/TripSearch';
 import type { Route$Auslastung, SingleRoute } from '@/types/routing';
 
 async function getRelevantTrip(
@@ -47,10 +47,8 @@ async function getRelevantTrip(
   return relevantTrip;
 }
 
-const stopOccupancyCache = new Cache<string, Route$Auslastung | undefined>(
+const stopOccupancyCache = new Cache<Route$Auslastung | undefined>(
   CacheDatabase.HafasStopOccupancy,
-  10 * 60,
-  undefined,
 );
 
 export async function stopOccupancy(

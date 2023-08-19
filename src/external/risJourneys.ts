@@ -3,26 +3,30 @@ import { addUseragent } from '@/external/randomUseragent';
 import { Cache, CacheDatabase } from '@/server/cache';
 import { differenceInHours, format } from 'date-fns';
 import { JourneysApi, TransportType } from '@/external/generated/risJourneys';
+import { logger } from '@/server/logger';
 import { risJourneysConfiguration } from '@/external/config';
 import { upstreamApiCountInterceptor } from '@/server/admin';
 import axios from 'axios';
 import type {
   JourneyEventBased,
   JourneyMatch,
-  StationShort,
+  StopPlaceEmbedded,
   TransportPublic,
 } from '@/external/generated/risJourneys';
 import type { ParsedJourneyMatchResponse } from '@/types/HAFAS/JourneyMatch';
 import type { ParsedProduct } from '@/types/HAFAS';
 import type { Route$Stop } from '@/types/routing';
 
-const journeyFindCache = new Cache<string, JourneyMatch[]>(
-  CacheDatabase.JourneyFind,
-  18 * 60 * 60,
+const journeyFindCache = new Cache<JourneyMatch[]>(CacheDatabase.JourneyFind);
+
+const journeyCache = new Cache<JourneyEventBased>(CacheDatabase.Journey);
+
+logger.info(
+  `using ${process.env.RIS_JOURNEYS_USER_AGENT} as RIS::Journeys UserAgent`,
 );
 
 const axiosWithTimeout = axios.create({
-  timeout: 4500,
+  timeout: 6500,
 });
 axiosWithTimeout.interceptors.request.use(
   addUseragent.bind(
@@ -58,7 +62,9 @@ const mapTransportToTrain = (transport: TransportPublic): ParsedProduct => ({
   number: `${transport.number}`,
 });
 
-const mapStationShortToRouteStops = (station: StationShort): Route$Stop => ({
+const mapStationShortToRouteStops = (
+  station: StopPlaceEmbedded,
+): Route$Stop => ({
   station,
 });
 
@@ -150,10 +156,21 @@ export async function getJourneyDetails(
   journeyId: string,
 ): Promise<JourneyEventBased | undefined> {
   try {
-    const r = await risJourneysClient.journeyEventbasedById({
+    if (!process.env.RIS_JOURNEYS_CACHE_DISABLED) {
+      const cached = await journeyCache.get(journeyId);
+      if (cached) {
+        return cached;
+      }
+    }
+    const r = await risJourneysClient.journeyEventBasedById({
       journeyID: journeyId,
       includeJourneyReferences: true,
+      includeCanceled: true,
     });
+
+    if (!process.env.RIS_JOURNEYS_CACHE_DISABLED) {
+      void journeyCache.set(journeyId, r.data);
+    }
 
     return r.data;
   } catch {

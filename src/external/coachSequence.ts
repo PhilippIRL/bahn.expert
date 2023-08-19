@@ -1,6 +1,12 @@
+import {
+  addHours,
+  format,
+  formatISO,
+  isWithinInterval,
+  subHours,
+} from 'date-fns';
 import { Cache, CacheDatabase } from '@/server/cache';
 import { coachSequenceConfiguration } from '@/external/config';
-import { format, formatISO } from 'date-fns';
 import { logger } from '@/server/logger';
 import { TransportsApi } from '@/external/generated/coachSequence';
 import { UpstreamApiRequestMetric } from '@/server/admin';
@@ -17,10 +23,16 @@ const coachSequenceClient = new TransportsApi(
   axiosWithTimeout,
 );
 
-const negativeHitCache = new Cache<string, boolean>(
-  CacheDatabase.NegativeNewSequence,
-  12 * 60 * 60,
-);
+const negativeHitCache = new Cache<boolean>(CacheDatabase.NegativeNewSequence);
+
+export function isWithin20Hours(date: Date): boolean {
+  const start = subHours(new Date(), 20);
+  const end = addHours(new Date(), 20);
+  return isWithinInterval(date, {
+    start,
+    end,
+  });
+}
 
 export async function getDepartureSequence(
   trainCategory: string,
@@ -29,6 +41,9 @@ export async function getDepartureSequence(
   plannedDepartureDate: Date,
   initialDepartureDate: Date,
 ): Promise<VehicleSequenceDeparture | undefined> {
+  if (!isWithin20Hours(plannedDepartureDate)) {
+    return undefined;
+  }
   const cacheKey = `${trainCategory}${trainNumber}${evaNumber}${plannedDepartureDate.toISOString()}${initialDepartureDate.toISOString()}`;
   try {
     const wasNotFound = await negativeHitCache.exists(cacheKey);

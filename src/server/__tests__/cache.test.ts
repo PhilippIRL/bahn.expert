@@ -1,20 +1,24 @@
-import { Cache } from '@/server/cache';
+import { Cache, parseCacheTTL } from '@/server/cache';
 
-const defineCacheTests = (createCache: () => Cache<string, unknown>) => {
-  const cache: Cache<string, unknown> = createCache();
+const defineCacheTests = (createCache: () => Cache<unknown>) => {
+  const cache: Cache<unknown> = createCache();
 
-  it('can save explicit undefined', async () => {
-    await cache.set('undef', undefined);
-    expect(await cache.get('undef')).toBeUndefined();
+  afterAll(async () => {
+    await cache.clearAll();
   });
-  it('can save implicit undefined', async () => {
+
+  it('can set explicit undefined', async () => {
+    await cache.set('set-explicit-undef', undefined);
+    expect(await cache.get('set-explicit-undef')).toBeUndefined();
+  });
+  it('can set implicit undefined', async () => {
     // @ts-expect-error test only
-    await cache.set('');
-    expect(await cache.get('')).toBeUndefined();
+    await cache.set('set-implicit-undef');
+    expect(await cache.get('set-implicit-undef')).toBeUndefined();
   });
-  it('can save null', async () => {
-    await cache.set('null', null);
-    expect(await cache.get('null')).toBeNull();
+  it('can set null', async () => {
+    await cache.set('set-null', null);
+    expect(await cache.get('set-null')).toBeNull();
   });
 
   it('can save objects', async () => {
@@ -32,14 +36,31 @@ const defineCacheTests = (createCache: () => Cache<string, unknown>) => {
 
 describe('Cache', () => {
   describe('memory', () => {
-    defineCacheTests(() => new Cache(0, 100, undefined, { skipRedis: true }));
+    defineCacheTests(() => new Cache(0, undefined, { skipRedis: true }));
   });
 
   if (process.env.REDIS_HOST) {
     describe('redis', () => {
-      defineCacheTests(
-        () => new Cache(1, 100, undefined, { skipMemory: true }),
-      );
+      defineCacheTests(() => new Cache(1, undefined, { skipMemory: true }));
     });
   }
+});
+
+describe('parse Cache TTL', () => {
+  const defaultTTL = 'PT2M';
+  it('undefined', () => {
+    expect(parseCacheTTL(defaultTTL, undefined)).toBe(defaultTTL);
+  });
+  it('seconds', () => {
+    expect(parseCacheTTL(defaultTTL, '3600')).toBe('PT3600S');
+  });
+  it('iso', () => {
+    expect(parseCacheTTL(defaultTTL, 'PT4M')).toBe('PT4M');
+  });
+  it('invalid iso', () => {
+    expect(parseCacheTTL(defaultTTL, 'Something')).toBe(defaultTTL);
+  });
+  it('calendar problems', () => {
+    expect(parseCacheTTL(defaultTTL, 'P4M')).toBe(defaultTTL);
+  });
 });

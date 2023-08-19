@@ -1,8 +1,27 @@
 import { checkSecrets } from '@/server/checkSecret';
 import { logger } from '@/server/logger';
 import { LRUCache } from 'lru-cache';
+import { Temporal } from '@js-temporal/polyfill';
 import Redis from 'ioredis';
 import v8 from 'node:v8';
+
+export function parseCacheTTL(
+  defaultTTL: string,
+  rawCacheTTL?: string,
+): string {
+  if (!rawCacheTTL) {
+    return defaultTTL;
+  }
+  if (!Number.isNaN(Number.parseInt(rawCacheTTL))) {
+    return `PT${rawCacheTTL}S`;
+  }
+  try {
+    Temporal.Duration.from(rawCacheTTL).total('second');
+    return rawCacheTTL;
+  } catch {
+    return defaultTTL;
+  }
+}
 
 function dateSerialize(this: any, key: string, value: any): any {
   // eslint-disable-next-line babel/no-invalid-this
@@ -33,7 +52,7 @@ const redisSettings = process.env.REDIS_HOST
     }
   : undefined;
 
-export const enum CacheDatabase {
+export enum CacheDatabase {
   Station,
   TimetableParsedWithWings,
   DBLageplan,
@@ -49,16 +68,43 @@ export const enum CacheDatabase {
   StopPlaceSalesSearch,
   JourneyFind,
   NegativeNewSequence = 14,
-  // Was TimetableParsedPlan
+  SBBStopPlaces,
   HafasStopOccupancy = 16,
   AdditionalJourneyInformation,
-  CoachSequenceNotfound,
-  // CoachSequenceNewApps,
-  // CoachSequenceNoncd,
+  HAFASJourneyMatch,
+  Journey = 19,
+  SBBTrip,
 }
 
-const parsedEnvTTL = Number.parseInt(process.env.DEFAULT_TTL!);
-const defaultTTL = Number.isNaN(parsedEnvTTL) ? 24 * 60 * 60 : parsedEnvTTL;
+const CacheTTLs: Record<CacheDatabase, string> = {
+  [CacheDatabase.Station]: 'PT24H',
+  [CacheDatabase.TimetableParsedWithWings]: 'PT24H',
+  [CacheDatabase.DBLageplan]: 'PT48H',
+  [CacheDatabase.LocMatch]: 'PT24H',
+  [CacheDatabase.HIMMessage]: 'PT24H',
+  [CacheDatabase.NAHSHLageplan]: 'PT48H',
+  [CacheDatabase.StopPlaceSearch]: 'PT24H',
+  [CacheDatabase.CoachSequenceFound]: parseCacheTTL(
+    'PT15M',
+    process.env.COACH_SEQUENCE_CACHE_TTL,
+  ),
+  [CacheDatabase.StopPlaceIdentifier]: 'PT24H',
+  [CacheDatabase.StopPlaceByEva]: 'PT24H',
+  [CacheDatabase.StopPlaceByRil]: 'PT24H',
+  [CacheDatabase.StopPlaceGroups]: 'PT24H',
+  [CacheDatabase.StopPlaceSalesSearch]: 'PT24H',
+  [CacheDatabase.JourneyFind]: 'PT36H',
+  [CacheDatabase.HAFASJourneyMatch]: 'PT12H',
+  [CacheDatabase.NegativeNewSequence]: 'PT12H',
+  [CacheDatabase.SBBStopPlaces]: 'P1D',
+  [CacheDatabase.HafasStopOccupancy]: 'PT30M',
+  [CacheDatabase.AdditionalJourneyInformation]: 'PT10M',
+  [CacheDatabase.Journey]: parseCacheTTL(
+    'PT5M',
+    process.env.RIS_JOURNEYS_CACHE_TTL,
+  ),
+  [CacheDatabase.SBBTrip]: 'PT2H',
+};
 
 const activeRedisCaches = new Set<Redis>();
 
@@ -68,13 +114,12 @@ export function disconnectRedis(): void {
   }
 }
 
-export class Cache<K extends string, V> {
-  private lruCache?: LRUCache<K, Buffer>;
+export class Cache<V> {
+  private lruCache?: LRUCache<string, Buffer>;
   private redisCache?: Redis;
+  private ttl: number;
   constructor(
     database: CacheDatabase,
-    /** In Seconds */
-    private ttl: number = defaultTTL,
     maxEntries = 1000000,
     // eslint-disable-next-line unicorn/no-object-as-default-parameter
     { skipMemory, skipRedis }: { skipMemory?: boolean; skipRedis?: boolean } = {
@@ -82,11 +127,15 @@ export class Cache<K extends string, V> {
       skipMemory: Boolean(redisSettings),
     },
   ) {
+    this.ttl = Temporal.Duration.from(CacheTTLs[database]).total('second');
+    logger.info(
+      `Using ${CacheTTLs[database]} as TTL for ${CacheDatabase[database]}`,
+    );
     this.lruCache = skipMemory
       ? undefined
       : new LRUCache({
           /** in ms */
-          ttl: (ttl / 2) * 1000,
+          ttl: (this.ttl / 2) * 1000,
           max: maxEntries / 500,
         });
     if (!skipRedis) {
@@ -107,10 +156,10 @@ export class Cache<K extends string, V> {
 
     return JSON.parse(raw, dateDeserialze);
   }
-  private memorySet(key: K, value: V) {
+  private memorySet(key: string, value: V) {
     this.lruCache?.set(key, v8.serialize(value));
   }
-  async get(key: K): Promise<V | undefined> {
+  async get(key: string): Promise<V | undefined> {
     if (this.lruCache?.has(key)) {
       const cached = this.lruCache?.get(key);
       if (cached) {
@@ -132,7 +181,7 @@ export class Cache<K extends string, V> {
       logger.error(e, 'Redis get failed');
     }
   }
-  async set(key: K, value: V): Promise<void> {
+  async set(key: string, value: V): Promise<void> {
     this.memorySet(key, value);
     try {
       await this.redisCache?.set(
@@ -145,10 +194,28 @@ export class Cache<K extends string, V> {
       logger.error(e, 'Redis set failed');
     }
   }
-  async exists(key: K): Promise<boolean> {
+  async exists(key: string): Promise<boolean> {
     if (this.lruCache?.has(key)) {
       return true;
     }
     return Boolean(await this.redisCache?.exists(key));
+  }
+  async clearAll(): Promise<void> {
+    this.lruCache?.clear();
+    await this.redisCache?.flushall();
+  }
+  async getAll(): Promise<[string, V][]> {
+    let keys: string[] = [];
+    if (this.lruCache) {
+      keys = [...this.lruCache.keys()];
+    }
+    if (this.redisCache) {
+      keys = await this.redisCache.keys('*');
+    }
+    // @ts-expect-error works
+    const entries: [string, V][] = (
+      await Promise.all(keys.map(async (k) => [k, await this.get(k)]))
+    ).filter(([_, value]) => Boolean(value));
+    return entries;
   }
 }

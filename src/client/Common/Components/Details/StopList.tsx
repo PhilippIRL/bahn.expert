@@ -2,6 +2,7 @@ import { css } from '@emotion/react';
 import { Error } from '@mui/icons-material';
 import { Loading } from '../Loading';
 import { Stop } from '@/client/Common/Components/Details/Stop';
+import { TravelsWithSummary } from '@/client/Common/Components/Details/TravelsWithSummary';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDetails } from '@/client/Common/provider/DetailsProvider';
 import styled from '@emotion/styled';
@@ -44,7 +45,7 @@ export const StopList: FC = () => {
   }, []);
 
   useEffect(() => {
-    if (details && details.currentStop) {
+    if (details?.currentStop) {
       setCurrentSequenceStop(details.currentStop.station.evaNumber);
       const scrollDom = document.getElementById(
         details.currentStop.station.evaNumber,
@@ -77,6 +78,7 @@ export const StopList: FC = () => {
               ? details.train
               : undefined
           }
+          lastArrivalEva={details.segmentDestination.evaNumber}
           initialDepartureDate={initialDepartureDate}
         />
       );
@@ -97,6 +99,7 @@ export const StopList: FC = () => {
 
   return (
     <Container>
+      <TravelsWithSummary stops={details.stops} />
       {/* <Messages messages={details.messages} /> */}
       {detailsStops}
     </Container>

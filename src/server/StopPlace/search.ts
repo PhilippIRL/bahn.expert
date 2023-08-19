@@ -11,23 +11,20 @@ import type {
   StopPlaceSearchResult,
 } from '@/external/types';
 
-const stopPlaceStationSearchCache = new Cache<string, GroupedStopPlace[]>(
+const stopPlaceStationSearchCache = new Cache<GroupedStopPlace[]>(
   CacheDatabase.StopPlaceSearch,
 );
-const stopPlaceSalesSearchCache = new Cache<string, GroupedStopPlace[]>(
+const stopPlaceSalesSearchCache = new Cache<GroupedStopPlace[]>(
   CacheDatabase.StopPlaceSalesSearch,
 );
-const stopPlaceIdentifierCache = new Cache<
-  string,
-  StopPlaceIdentifier | undefined
->(CacheDatabase.StopPlaceIdentifier);
-const stopPlaceByRilCache = new Cache<string, StopPlace>(
-  CacheDatabase.StopPlaceByRil,
+const stopPlaceIdentifierCache = new Cache<StopPlaceIdentifier | undefined>(
+  CacheDatabase.StopPlaceIdentifier,
 );
-const stopPlaceByEvaCache = new Cache<string, GroupedStopPlace>(
+const stopPlaceByRilCache = new Cache<StopPlace>(CacheDatabase.StopPlaceByRil);
+const stopPlaceByEvaCache = new Cache<GroupedStopPlace>(
   CacheDatabase.StopPlaceByEva,
 );
-const stopPlaceGroupCache = new Cache<string, ResolvedStopPlaceGroups>(
+const stopPlaceGroupCache = new Cache<ResolvedStopPlaceGroups>(
   CacheDatabase.StopPlaceGroups,
 );
 
@@ -218,6 +215,7 @@ async function addIdentifiers(stopPlaces: GroupedStopPlace[]): Promise<void> {
         stopPlace.ifopt = identifier.ifopt;
         stopPlace.ril100 = identifier.ril100;
         stopPlace.stationId = identifier.stationId;
+        stopPlace.uic = identifier.uic;
       }
     }),
   );
@@ -254,6 +252,10 @@ export async function getIdentifiers(
         }
         case StopPlaceKeyType.Stada: {
           identifier.stationId = key;
+          break;
+        }
+        case StopPlaceKeyType.Uic: {
+          identifier.uic = key;
           break;
         }
       }

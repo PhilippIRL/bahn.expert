@@ -46,8 +46,8 @@ export interface OebbSector {
 }
 
 export interface OebbHaltepunkt {
-  haltepunktInMeters: unknown | null;
-  departureDirectionSectorA: unknown | null;
+  haltepunktInMeters?: unknown;
+  departureDirectionSectorA?: unknown;
 }
 
 export interface OebbPlatform {
@@ -57,7 +57,7 @@ export interface OebbPlatform {
   egresses: OebbEgress[];
 }
 
-export interface OebbReihung {
+export interface OebbCoachSequence {
   trainName: string;
   /**
    * always true so far?

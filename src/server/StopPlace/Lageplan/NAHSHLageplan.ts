@@ -3,11 +3,7 @@ import { Cache, CacheDatabase } from '@/server/cache';
 import { locMatch } from '@/server/HAFAS/LocMatch';
 import Axios from 'axios';
 
-// 48 hours in seconds
-const cache = new Cache<string, string | null>(
-  CacheDatabase.NAHSHLageplan,
-  48 * 60 * 60,
-);
+const cache = new Cache<string | null>(CacheDatabase.NAHSHLageplan);
 
 function normalizeStationName(stationName: string) {
   return stationName

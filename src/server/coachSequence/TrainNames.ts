@@ -1,8 +1,6 @@
 // List from https://de.wikipedia.org/wiki/Liste_nach_Gemeinden_und_Regionen_benannter_IC/ICE-Fahrzeuge#Namensgebung_ICE-Triebz%C3%BCge_nach_Gemeinden
 
-const naming: {
-  [key: number]: string;
-} = {
+const naming: Record<number, string> = {
   // ICE 1 - BR 401
   101: 'Gießen',
   102: 'Jever',
@@ -19,7 +17,6 @@ const naming: {
   115: 'Regensburg',
   116: 'Pforzheim',
   117: 'Hof',
-  118: 'Gelnhausen',
   119: 'Osnabrück',
   120: 'Lüneburg',
   152: 'Hanau',

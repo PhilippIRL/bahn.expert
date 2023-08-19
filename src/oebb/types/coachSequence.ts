@@ -89,11 +89,7 @@ export interface OEBBTimeTableInfo {
   portions: OEBBPortion[];
 }
 
-export type OEBBAccessType =
-  | 'STIEGENAUFGANG'
-  | 'AUFZUG'
-  | 'STIEGENAUFGANG'
-  | 'ROLLTREPPE';
+export type OEBBAccessType = 'STIEGENAUFGANG' | 'AUFZUG' | 'ROLLTREPPE';
 
 export interface OEBBAccess {
   platform: string;
@@ -118,10 +114,19 @@ export interface OEBBPlatformInfo {
   length: number;
   sectors: OEBBSector[];
 }
+
+interface OEBBLoadStat {
+  ranking: number;
+  ratio: number;
+}
+interface OEBBLoad {
+  stats: OEBBLoadStat[];
+}
 export interface OEBBInfo {
   timeTableInfo: OEBBTimeTableInfo;
   train?: OEBBTrainInfo;
   accessess: OEBBAccess[];
   trainOnPlatform?: OEBBTrainOnPlatform;
   platform?: OEBBPlatformInfo;
+  load?: OEBBLoad;
 }

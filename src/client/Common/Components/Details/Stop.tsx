@@ -1,10 +1,11 @@
 import { AuslastungsDisplay } from '@/client/Common/Components/AuslastungsDisplay';
+import { CoachSequence } from '../CoachSequence/CoachSequence';
 import { DetailMessages } from '../Messages/Detail';
 import { Messages } from './Messages';
 import { Platform } from '@/client/Common/Components/Platform';
-import { Reihung } from '../Reihung';
 import { StopPlaceLink } from '@/client/Common/Components/StopPlaceLink';
 import { Time } from '@/client/Common/Components/Time';
+import { TravelsWith } from '@/client/Common/Components/Details/TravelsWith';
 import { TravelynxLink } from '@/client/Common/Components/CheckInLink/TravelynxLink';
 import { useCallback, useMemo } from 'react';
 import { useDetails } from '@/client/Common/provider/DetailsProvider';
@@ -47,15 +48,22 @@ const DeparturePlatform = styled(Platform)`
   grid-area: depP;
 `;
 
-const ReihungContainer = styled.div`
+const CoachSequenceContainer = styled.div`
   grid-area: wr;
   font-size: 0.5em;
   overflow: hidden;
 `;
 
+const TravelsWithContainer = styled.div`
+  grid-area: tw;
+  padding-left: 1em;
+  display: flex;
+  flex-direction: column;
+`;
+
 const MessageContainer = styled.div`
   grid-area: m;
-  padding-left: 0.75em;
+  padding-left: 1em;
 `;
 
 const StyledTravelynxLink = styled(TravelynxLink)`
@@ -78,7 +86,7 @@ const Container = styled.div<{
     gridTemplateRows: '1fr',
     gridTemplateAreas: `"ar t ${samePlatform ? 'depP' : 'arrP'} c" "dp ${
       hasOccupancy ? 'o' : 't'
-    } depP c" "wr wr wr wr" "m m m m"`,
+    } depP c" "tw tw tw tw" "wr wr wr wr" "m m m m"`,
     alignItems: 'center',
     borderBottom: `1px solid ${theme.palette.text.primary}`,
     position: 'relative',
@@ -96,6 +104,7 @@ interface Props {
   initialDepartureDate?: Date;
   onStopClick?: (stop: Route$Stop) => void;
   doNotRenderOccupancy?: boolean;
+  lastArrivalEva?: string;
 }
 export const Stop: FC<Props> = ({
   stop,
@@ -105,6 +114,7 @@ export const Stop: FC<Props> = ({
   initialDepartureDate,
   onStopClick,
   doNotRenderOccupancy,
+  lastArrivalEva,
 }) => {
   const { urlPrefix, additionalInformation } = useDetails();
   const occupancy = useMemo(
@@ -153,6 +163,7 @@ export const Stop: FC<Props> = ({
       <ScrollMarker id={stop.station.evaNumber} />
       {stop.arrival && (
         <ArrivalTime
+          isPlan={stop.arrival.isPlan}
           cancelled={stop.arrival.cancelled}
           real={stop.arrival.time}
           delay={stop.arrival.delay}
@@ -179,24 +190,33 @@ export const Stop: FC<Props> = ({
           real={stop.departure.time}
           delay={stop.departure.delay}
           isRealTime={stop.departure.isRealTime}
+          isPlan={stop.departure.isPlan}
         />
       )}
       <DeparturePlatform {...platforms.departure} />
       {!samePlatform && <ArrivalPlatform {...platforms.arrival} />}
+      <TravelsWithContainer>
+        <TravelsWith
+          stopEva={stop.station.evaNumber}
+          joinsWith={stop.joinsWith}
+          splitsWith={stop.splitsWith}
+        />
+      </TravelsWithContainer>
       {/* {stop.messages && <div>{stop.messages.map(m => m.txtN)}</div>} */}
-      <ReihungContainer>
+      <CoachSequenceContainer>
         {showWR?.number && depOrArrival && (
-          <Reihung
+          <CoachSequence
             trainNumber={showWR.number}
             trainCategory={showWR.type}
             currentEvaNumber={stop.station.evaNumber}
             scheduledDeparture={depOrArrival.scheduledTime}
             initialDeparture={initialDepartureDate}
+            lastArrivalEva={lastArrivalEva}
             administration={train?.admin}
             loadHidden={!depOrArrival?.reihung}
           />
         )}
-      </ReihungContainer>
+      </CoachSequenceContainer>
       <MessageContainer>
         {stop.irisMessages && <DetailMessages messages={stop.irisMessages} />}
         <Messages messages={stop.messages} />

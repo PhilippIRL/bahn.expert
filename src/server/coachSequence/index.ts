@@ -7,6 +7,7 @@ import {
 import { DBCoachSequence } from '@/server/coachSequence/DB';
 import { newDBCoachSequence } from '@/server/coachSequence/newDB';
 import { OEBBCoachSequence } from '@/server/coachSequence/OEBB';
+import { SBBCoachSequence } from '@/server/coachSequence/SBB';
 import type { CoachSequenceInformation } from '@/types/coachSequence';
 import type { EvaNumber } from '@/types/common';
 
@@ -17,6 +18,7 @@ export async function coachSequence(
   initialDeparture?: Date,
   trainCategory?: string,
   administration?: string,
+  arrivalEva?: string,
 ): Promise<CoachSequenceInformation | undefined> {
   if (
     !isWithinInterval(departure, {
@@ -26,6 +28,18 @@ export async function coachSequence(
   ) {
     return;
   }
+
+  if (evaNumber && evaNumber.startsWith('85') && arrivalEva) {
+    const sbbSequence = await SBBCoachSequence(
+      evaNumber,
+      trainNumber,
+      departure,
+      arrivalEva,
+    );
+
+    return sbbSequence;
+  }
+
   if (evaNumber && initialDeparture && !evaNumber.startsWith('80')) {
     const oebbSequence = await OEBBCoachSequence(
       trainNumber,

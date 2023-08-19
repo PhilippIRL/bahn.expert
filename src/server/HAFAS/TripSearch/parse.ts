@@ -40,8 +40,8 @@ function parseFullStation(fullStation: string): MinimalStopPlace {
   let name = '';
   let evaNumber = '';
 
-  if (titleMatch && titleMatch[1]) name = titleMatch[1];
-  if (idMatch && idMatch[1]) evaNumber = idMatch[1].padStart(7, '0');
+  if (titleMatch?.[1]) name = titleMatch[1];
+  if (idMatch?.[1]) evaNumber = idMatch[1].padStart(7, '0');
 
   return {
     name,
@@ -81,7 +81,10 @@ const AllowedLegTypes = new Set(['JNY', 'WALK', 'TRSF']);
 
 export class Journey {
   private date: Date;
-  constructor(private raw: OutConL, private common: ParsedCommon) {
+  constructor(
+    private raw: OutConL,
+    private common: ParsedCommon,
+  ) {
     this.date = parse(raw.date, 'yyyyMMdd', new Date());
   }
   parseJourney = (): Promise<SingleRoute> => {

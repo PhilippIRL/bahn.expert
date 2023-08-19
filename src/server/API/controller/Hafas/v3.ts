@@ -11,16 +11,26 @@ import {
   Route,
   Tags,
 } from '@tsoa/runtime';
+import { locMatch } from '@/server/HAFAS/LocMatch';
 import { stopOccupancy } from '@/server/HAFAS/occupancy';
+import { tripSearch } from '@/server/HAFAS/TripSearch/TripSearch';
 import StationBoard from '@/server/HAFAS/StationBoard';
 import StationBoardToTimetables from '@/server/HAFAS/StationBoard/StationBoardToTimetables';
-import TripSearch from '@/server/HAFAS/TripSearch';
 import type { AbfahrtenResult } from '@/types/iris';
 import type { AdditionalJourneyInformation } from '@/types/HAFAS/JourneyDetails';
-import type { AllowedHafasProfile } from '@/types/HAFAS';
-import type { ArrivalStationBoardEntry } from '@/types/stationBoard';
+import type {
+  AllowedHafasProfile,
+  HafasResponse,
+  HafasStation,
+} from '@/types/HAFAS';
+import type {
+  ArrivalStationBoardEntry,
+  StationBoardEntry,
+} from '@/types/stationBoard';
 import type { Request as KRequest } from 'koa';
+import type { LocMatchResponse } from '@/types/HAFAS/LocMatch';
 import type { Route$Auslastung, RoutingResult } from '@/types/routing';
+import type { StationBoardResponse } from '@/types/HAFAS/StationBoard';
 import type { TripSearchOptionsV3 } from '@/types/HAFAS/TripSearch';
 import type { TsoaResponse } from '@tsoa/runtime';
 
@@ -38,7 +48,7 @@ export class HafasControllerV3 extends Controller {
     @Body() body: TripSearchOptionsV3,
     @Query() profile?: AllowedHafasProfile,
   ): Promise<RoutingResult> {
-    return TripSearch(body, profile, Boolean(req.query.raw));
+    return tripSearch(body, profile, Boolean(req.query.raw));
   }
 
   @Get('/additionalInformation/{trainName}/{journeyId}')
@@ -104,6 +114,65 @@ export class HafasControllerV3 extends Controller {
     return foundOccupancy || notFoundResponse(404);
   }
 
+  @Get('/departures/{evaNumber}')
+  @Tags('HAFAS')
+  async departures(
+    evaNumber: string,
+    @Query() profile?: AllowedHafasProfile,
+  ): Promise<StationBoardEntry[]> {
+    const departures = await StationBoard(
+      {
+        type: 'DEP',
+        station: evaNumber,
+      },
+      profile,
+    );
+
+    return departures;
+  }
+
+  @Get('/departures/{evaNumber}/raw')
+  @Tags('HAFAS')
+  async departuresRaw(
+    evaNumber: string,
+    @Query() profile?: AllowedHafasProfile,
+  ): Promise<HafasResponse<StationBoardResponse>> {
+    const departures = await StationBoard(
+      {
+        type: 'DEP',
+        station: evaNumber,
+      },
+      profile,
+      true,
+    );
+
+    // @ts-expect-error works
+    return departures;
+  }
+
+  @Get('/stopPlaceSearch/{query}')
+  @Tags('HAFAS')
+  async stopPlaceSearch(
+    query: string,
+    @Query() profile?: AllowedHafasProfile,
+  ): Promise<HafasStation[]> {
+    const result = await locMatch(query, 'S', profile);
+
+    return result;
+  }
+
+  @Get('/stopPlaceSearch/{query}/raw')
+  @Tags('HAFAS')
+  async stopPlaceSearchRaw(
+    query: string,
+    @Query() profile?: AllowedHafasProfile,
+  ): Promise<HafasResponse<LocMatchResponse>> {
+    const result = await locMatch(query, 'S', profile, true);
+
+    // @ts-expect-error works
+    return result;
+  }
+
   @Get('/irisCompatibleAbfahrten/{evaId}')
   @Tags('HAFAS')
   async irisCompatibleAbfahrten(
@@ -127,12 +196,7 @@ export class HafasControllerV3 extends Controller {
 
     const mappedHafasArrivals =
       hafasArrivals?.reduce(
-        (
-          map: {
-            [key: string]: ArrivalStationBoardEntry;
-          },
-          arrival,
-        ) => {
+        (map: Record<string, ArrivalStationBoardEntry>, arrival) => {
           map[`${arrival.jid}${arrival.train.number}`] = arrival;
 
           return map;

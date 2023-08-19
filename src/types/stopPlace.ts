@@ -8,6 +8,7 @@ export interface StopPlaceIdentifier {
   ril100?: string;
   alternativeRil100?: string[];
   evaNumber: string;
+  uic?: string;
 }
 
 export interface GroupedStopPlace {
@@ -19,6 +20,7 @@ export interface GroupedStopPlace {
   ril100?: string;
   alternativeRil100?: string[];
   stationId?: string;
+  uic?: string;
 }
 
 export type MinimalStopPlace = Pick<
@@ -30,9 +32,10 @@ export interface TrainOccupancy<out T> {
   train: TrainOccupancyList<T>;
 }
 
-export interface TrainOccupancyList<out T = Route$Auslastung> {
-  [trainNumber: string]: T | null;
-}
+export type TrainOccupancyList<out T = Route$Auslastung> = Record<
+  string,
+  T | null
+>;
 
 export interface VRRTrainOccupancy {
   /**
